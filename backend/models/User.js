@@ -2,14 +2,24 @@ import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
-    name: String,
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
 
     email: {
       type: String,
+      required: true,
       unique: true,
+      lowercase: true,
+      trim: true,
     },
 
-    password: String,
+    password: {
+      type: String,
+      required: true,
+    },
 
     role: {
       type: String,
@@ -17,12 +27,27 @@ const userSchema = new mongoose.Schema(
       default: "user",
     },
 
-    // 🔥 PASSWORD CHANGE TRACK
+    // Profile Photo
+    photo: {
+      type: String,
+      default: "",
+    },
+
+    // About User
+    about: {
+      type: String,
+      default: "",
+      maxlength: 1000,
+    },
+
+    // Password Change Tracking
     lastPasswordChanged: {
       type: Date,
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
 export default mongoose.model("User", userSchema);

@@ -129,7 +129,7 @@ export default function Hero({listingId}) {
 </button>
   </Link>
  
-  <button
+  {/* <button
   onClick={() => {
     setOpen(true);
   }}
@@ -154,7 +154,7 @@ export default function Hero({listingId}) {
   "
 >
   Book Now
-</button>
+</button> */}
    </div>
 </div>
     </section>

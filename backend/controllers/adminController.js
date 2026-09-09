@@ -10,39 +10,82 @@ import sendEmail from "../utils/sendEmail.js";
 dotenv.config();
 
 export const adminLogin = async (req, res) => {
-   console.log(req.body);
-  const { email, password } = req.body;
-  console.log("EMAIL:", email);
-console.log("PASSWORD:", password);
+  try {
+    console.log("========== ADMIN LOGIN ==========");
+    console.log("BODY:", {
+      email: req.body.email,
+      passwordProvided: !!req.body.password,
+    });
 
-  const admin = await User.findOne({ email });
-  if (!admin || (admin.role !== "admin" && admin.role !== "superadmin")) {
-    return res.status(403).json({
-      message: "Not an admin",
+    const email = req.body.email?.trim().toLowerCase();
+    const { password } = req.body;
+
+    const admin = await User.findOne({ email });
+
+    console.log("SEARCH EMAIL:", email);
+    console.log(
+      "USER FOUND:",
+      admin
+        ? {
+            id: admin._id,
+            email: admin.email,
+            role: admin.role,
+          }
+        : "NO USER"
+    );
+
+    if (!admin) {
+      return res.status(403).json({
+        message: "Admin account not found",
+      });
+    }
+
+    if (
+      admin.role !== "admin" &&
+      admin.role !== "superadmin"
+    ) {
+      return res.status(403).json({
+        message: `Account role "${admin.role}" is not allowed for admin login`,
+      });
+    }
+
+    const isMatch = await bcrypt.compare(
+      password,
+      admin.password
+    );
+
+    if (!isMatch) {
+      return res.status(400).json({
+        message: "Invalid credentials",
+      });
+    }
+
+    const token = jwt.sign(
+      {
+        id: admin._id,
+        role: admin.role,
+        email: admin.email,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "1d",
+      }
+    );
+
+    return res.json({
+      token,
+      id: admin._id,
+      name: admin.name,
+      email: admin.email,
+      role: admin.role,
+    });
+  } catch (error) {
+    console.error("ADMIN LOGIN ERROR:", error);
+
+    return res.status(500).json({
+      message: "Server error while logging in",
     });
   }
-  const isMatch = await bcrypt.compare(password, admin.password);
-  if (!isMatch) {
-    return res.status(400).json({ message: "Invalid credentials" });
-  }
-
-  const token = jwt.sign(
-    {
-      id: admin._id,
-      role: admin.role,
-      email: admin.email,
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: "1d" },
-  );
-
-  res.json({
-    token,
-    id: admin._id,
-    name: admin.name,
-    email: admin.email,
-    role: admin.role,
-  });
 };
 export const getAllUsers = async (req, res) => {
   const users = await User.find().select("-password");
@@ -133,16 +176,62 @@ export const createUser = async (req, res) => {
 };
 
 export const updateUser = async (req, res) => {
-  const { id } = req.params;
-  const { name, email, role } = req.body;
+  try {
 
-  const user = await User.findByIdAndUpdate(
-    id,
-    { name, email, role },
-    { new: true },
-  );
+    // Only Superadmin
+    if (req.user.role !== "superadmin") {
+      return res.status(403).json({
+        message: "Only Super Admin Allowed",
+      });
+    }
 
-  res.json(user);
+    const { id } = req.params;
+
+    const user = await User.findById(id);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    // Duplicate Email Check
+    if (
+      req.body.email &&
+      req.body.email !== user.email
+    ) {
+
+      const exists = await User.findOne({
+        email: req.body.email,
+        _id: { $ne: id },
+      });
+
+      if (exists) {
+        return res.status(400).json({
+          message: "Email already exists",
+        });
+      }
+
+      user.email = req.body.email;
+    }
+
+    user.name = req.body.name ?? user.name;
+    user.about = req.body.about ?? user.about;
+    user.role = req.body.role ?? user.role;
+
+    await user.save();
+
+    res.json(user);
+
+  } catch (err) {
+
+    console.log(err);
+
+    res.status(500).json({
+      message: err.message,
+    });
+
+  }
 };
 
 export const deleteUser = async (req, res) => {
@@ -186,27 +275,36 @@ export const deleteUser = async (req, res) => {
 };
 ``;
 
-export const changePassword = async (req, res) => {
+export const changeUserPassword = async (req, res) => {
+
   try {
-    const userId = req.user.id;
 
-    const { currentPassword, confirmCurrentPassword, newPassword } = req.body;
+    if (req.user.role !== "superadmin") {
+      return res.status(403).json({
+        message: "Only Super Admin Allowed",
+      });
+    }
 
-    // VALIDATION
-    if (!currentPassword || !confirmCurrentPassword || !newPassword) {
+    const { id } = req.params;
+
+    const {
+      newPassword,
+      confirmPassword,
+    } = req.body;
+
+    if (!newPassword || !confirmPassword) {
       return res.status(400).json({
         message: "All fields required",
       });
     }
 
-    // MATCH CURRENT PASSWORDS
-    if (currentPassword !== confirmCurrentPassword) {
+    if (newPassword !== confirmPassword) {
       return res.status(400).json({
-        message: "Current passwords do not match",
+        message: "Passwords do not match",
       });
     }
 
-    const user = await User.findById(userId);
+    const user = await User.findById(id);
 
     if (!user) {
       return res.status(404).json({
@@ -214,52 +312,28 @@ export const changePassword = async (req, res) => {
       });
     }
 
-    // CHECK CURRENT PASSWORD
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    user.password = await bcrypt.hash(
+      newPassword,
+      10
+    );
 
-    if (!isMatch) {
-      return res.status(400).json({
-        message: "Current password incorrect",
-      });
-    }
-
-    // HASH NEW PASSWORD
-    const hashed = await bcrypt.hash(newPassword, 10);
-
-    user.password = hashed;
-
-    // TRACK PASSWORD CHANGE
     user.lastPasswordChanged = new Date();
 
-   await user.save();
+    await user.save();
 
-await sendEmail(
-  "Contact@digifyamerica.com",
-  "User Password Changed",
-  `
-    <h2>Password Changed Alert</h2>
+    res.json({
+      message: "Password Changed Successfully",
+    });
 
-    <p><strong>${user.name}</strong> changed their password.</p>
-
-    <p>Email: ${user.email}</p>
-
-    <p>Time: ${new Date().toLocaleString()}</p>
-  `,
-);
-
-res.json({
-  message: "Password changed successfully",
-});
   } catch (err) {
 
-  console.log(err);
+    res.status(500).json({
+      message: err.message,
+    });
 
-  res.status(500).json({
-    message: err.message,
-  });
-}
+  }
+
 };
-
 export const resetUserPassword = async (req, res) => {
   try {
     // 🔥 ONLY SUPER ADMIN
@@ -280,7 +354,9 @@ export const resetUserPassword = async (req, res) => {
     }
 
     // TEMP PASSWORD
-    const tempPassword = "Admin@" + Math.floor(1000 + Math.random() * 9000);
+   const tempPassword =
+  "Admin@" +
+  Math.random().toString(36).slice(-6).toUpperCase();
 
     const hashed = await bcrypt.hash(tempPassword, 10);
 
@@ -291,26 +367,64 @@ export const resetUserPassword = async (req, res) => {
     await user.save();
 
 await sendEmail(
-  "Contact@digifyamerica.com",
-  "User Password Changed",
+  user.email,
+  "Password Reset",
   `
-    <h2>Password Changed Alert</h2>
+    <h2>Password Reset</h2>
 
-    <p><strong>${user.name}</strong> changed their password.</p>
+    <p>Hello <strong>${user.name}</strong>,</p>
 
-    <p>Email: ${user.email}</p>
+    <p>Your password has been reset by the administrator.</p>
 
-    <p>Time: ${new Date().toLocaleString()}</p>
+    <p><strong>Temporary Password:</strong> ${tempPassword}</p>
+
+    <p>Please login and change your password immediately.</p>
   `,
 );
 
 res.json({
-  message: "Password changed successfully",
-  tempPassword,
+  success: true,
+  message: "Password reset successfully.",
 });
   } catch (err) {
     res.status(500).json({
       message: err.message
+    });
+  }
+};
+
+export const uploadUserPhoto = async (req, res) => {
+  try {
+    if (req.user.role !== "superadmin") {
+      return res.status(403).json({
+        message: "Only Super Admin Allowed",
+      });
+    }
+
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        message: "No file uploaded",
+      });
+    }
+
+    user.photo = `/uploads/profile/${req.file.filename}`;
+
+    await user.save();
+
+    res.json(user);
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({
+      message: err.message,
     });
   }
 };

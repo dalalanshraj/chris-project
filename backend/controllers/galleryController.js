@@ -40,11 +40,11 @@ export const uploadImage = async (
 // ✅ delete temp file
 fs.unlinkSync(file.path);
 
-      const created =
-        await Gallery.create({
-          image: `/gallery-uploads/${filename}`,
-          order: total + index,
-        });
+     const created = await Gallery.create({
+  image: `/gallery-uploads/${filename}`,
+  sectionType: req.body.sectionType || "",
+  order: total + index,
+});
 
       uploadedImages.push(created);
     }
