@@ -8,62 +8,89 @@ export const uploadImage = async (
   req,
   res
 ) => {
+
   try {
+
     const uploadedImages = [];
 
     const total =
       await Gallery.countDocuments();
 
-    for (const [index, file] of req.files.entries()) {
+    for (const [
+      index,
+      file,
+    ] of req.files.entries()) {
+
       const filename =
+
         Date.now() +
         "-" +
-        Math.round(Math.random() * 1e9) +
+        Math.round(
+          Math.random() * 1e9
+        ) +
         ".webp";
 
-      const outputPath = path.join(
-        process.cwd(),
-        "gallery-uploads",
-        filename
+      const outputPath =
+        path.join(
+          process.cwd(),
+          "gallery-uploads",
+          filename
+        );
+
+      // ✅ SHARP
+      await sharp(file.path)
+
+        .resize({
+          width: 1600,
+          withoutEnlargement: true,
+        })
+
+        .webp({
+          quality: 70,
+        })
+
+        .toFile(outputPath);
+
+      // ✅ DELETE TEMP FILE
+      fs.unlinkSync(file.path);
+
+      const created =
+        await Gallery.create({
+
+          image:
+            `/gallery-uploads/${filename}`,
+
+          order:
+            total + index,
+
+        });
+
+      uploadedImages.push(
+        created
       );
 
-    await sharp(file.path)
-  .resize({
-    width: 1600,
-    withoutEnlargement: true,
-  })
-  .webp({
-    quality: 75,
-  })
-  .toFile(outputPath);
-
-// ✅ delete temp file
-fs.unlinkSync(file.path);
-
-     const created = await Gallery.create({
-  image: `/gallery-uploads/${filename}`,
-  sectionType: req.body.sectionType || "",
-  order: total + index,
-});
-
-      uploadedImages.push(created);
     }
 
-    res.json(uploadedImages);
+    res.json(
+      uploadedImages
+    );
+
   } catch (err) {
+
     console.log(err);
 
     res.status(500).json({
+
       error: "Upload failed",
+
     });
+
   }
+
 };
 
 // GET ALL
-export const getAllImages = async (
-  req,
-  res
-) => {
+export const getAllImages = async (req, res) => {
   const data = await Gallery.find().sort({
     order: 1,
   });
@@ -72,23 +99,21 @@ export const getAllImages = async (
 };
 
 // GET PUBLISHED (frontend use)
-export const getPublishedImages =
-  async (req, res) => {
-    const data = await Gallery.find({
-      status: "published",
-    }).sort({
-      order: 1,
-    });
+export const getPublishedImages = async (req, res) => {
+  const data = await Gallery.find({
+    status: "published",
+  }).sort({
+    order: 1,
+  });
 
-    res.json(data);
-  };
+  res.json(data);
+};
 
 // TOGGLE
 export const toggleStatus = async (req, res) => {
   const item = await Gallery.findById(req.params.id);
 
-  item.status =
-    item.status === "published" ? "draft" : "published";
+  item.status = item.status === "published" ? "draft" : "published";
 
   await item.save();
 
@@ -96,39 +121,25 @@ export const toggleStatus = async (req, res) => {
 };
 
 // DELETE
-export const deleteImage = async (
-  req,
-  res
-) => {
+export const deleteImage = async (req, res) => {
   try {
-    const item = await Gallery.findById(
-      req.params.id
-    );
+    const item = await Gallery.findById(req.params.id);
 
     if (!item) {
-      return res
-        .status(404)
-        .json({
-          error: "Not found",
-        });
+      return res.status(404).json({
+        error: "Not found",
+      });
     }
 
-    const filename =
-      item.image.split("/").pop();
+    const filename = item.image.split("/").pop();
 
-    const filePath = path.join(
-      process.cwd(),
-      "gallery-uploads",
-      filename
-    );
+    const filePath = path.join(process.cwd(), "gallery-uploads", filename);
 
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
 
-    await Gallery.findByIdAndDelete(
-      req.params.id
-    );
+    await Gallery.findByIdAndDelete(req.params.id);
 
     res.json({
       success: true,
@@ -142,26 +153,19 @@ export const deleteImage = async (
   }
 };
 
-export const reorderGallery = async (
-  req,
-  res
-) => {
+export const reorderGallery = async (req, res) => {
   try {
     const updates = req.body.images;
 
     for (const item of updates) {
-      await Gallery.findByIdAndUpdate(
-        item._id,
-        {
-          order: item.order,
-        }
-      );
+      await Gallery.findByIdAndUpdate(item._id, {
+        order: item.order,
+      });
     }
 
-    const updated =
-      await Gallery.find().sort({
-        order: 1,
-      });
+    const updated = await Gallery.find().sort({
+      order: 1,
+    });
 
     res.json(updated);
   } catch (err) {

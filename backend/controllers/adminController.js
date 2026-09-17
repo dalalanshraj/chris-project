@@ -10,82 +10,38 @@ import sendEmail from "../utils/sendEmail.js";
 dotenv.config();
 
 export const adminLogin = async (req, res) => {
-  try {
-    console.log("========== ADMIN LOGIN ==========");
-    console.log("BODY:", {
-      email: req.body.email,
-      passwordProvided: !!req.body.password,
-    });
+   console.log(req.body);
+  const { email, password } = req.body;
+  
 
-    const email = req.body.email?.trim().toLowerCase();
-    const { password } = req.body;
-
-    const admin = await User.findOne({ email });
-
-    console.log("SEARCH EMAIL:", email);
-    console.log(
-      "USER FOUND:",
-      admin
-        ? {
-            id: admin._id,
-            email: admin.email,
-            role: admin.role,
-          }
-        : "NO USER"
-    );
-
-    if (!admin) {
-      return res.status(403).json({
-        message: "Admin account not found",
-      });
-    }
-
-    if (
-      admin.role !== "admin" &&
-      admin.role !== "superadmin"
-    ) {
-      return res.status(403).json({
-        message: `Account role "${admin.role}" is not allowed for admin login`,
-      });
-    }
-
-    const isMatch = await bcrypt.compare(
-      password,
-      admin.password
-    );
-
-    if (!isMatch) {
-      return res.status(400).json({
-        message: "Invalid credentials",
-      });
-    }
-
-    const token = jwt.sign(
-      {
-        id: admin._id,
-        role: admin.role,
-        email: admin.email,
-      },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: "1d",
-      }
-    );
-
-    return res.json({
-      token,
-      id: admin._id,
-      name: admin.name,
-      email: admin.email,
-      role: admin.role,
-    });
-  } catch (error) {
-    console.error("ADMIN LOGIN ERROR:", error);
-
-    return res.status(500).json({
-      message: "Server error while logging in",
+  const admin = await User.findOne({ email });
+  if (!admin || (admin.role !== "admin" && admin.role !== "superadmin")) {
+    return res.status(403).json({
+      message: "Not an admin",
     });
   }
+  const isMatch = await bcrypt.compare(password, admin.password);
+  if (!isMatch) {
+    return res.status(400).json({ message: "Invalid credentials" });
+  }
+
+  const token = jwt.sign(
+    {
+      id: admin._id,
+      role: admin.role,
+      email: admin.email,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "1d" },
+  );
+
+  res.json({
+    token,
+    id: admin._id,
+    name: admin.name,
+    email: admin.email,
+    role: admin.role,
+  });
 };
 export const getAllUsers = async (req, res) => {
   const users = await User.find().select("-password");

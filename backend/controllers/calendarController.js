@@ -1,7 +1,14 @@
 import Listing from "../models/Listing.js";
+
 import fetch from "node-fetch";
 import ical from "ical";
 import mongoose from "mongoose";
+import {
+  syncListingCalendars,
+  buildCalendarEntries,
+} from "../helpers/icalHelper.js";
+
+import { generateICal } from "../helpers/icalExportHelper.js";
 
 const toValidDate = (value) => {
   const d = new Date(value);
@@ -81,7 +88,7 @@ export const addCalendarDate = async (req, res) => {
       calendar: listing.calendar,
     });
   } catch (err) {
-    console.error("addCalendarDate error:", err);
+    
     res.status(500).json({ error: "Calendar update failed" });
   }
 };
@@ -139,7 +146,12 @@ export const getCalendar = async (req, res) => {
 
     res.json({
       calendar: normalizeCalendar(listing.calendar),
+
+      // Old (temporary)
       icalUrl: listing.icalUrl || "",
+
+      // New
+      icalSources: listing.icalSources || [],
     });
   } catch (err) {
     console.error("getCalendar error:", err);
@@ -176,34 +188,29 @@ export const blockDates = async (req, res) => {
     const start = new Date(startDate);
     const end = new Date(endDate);
 
-  const totalDays =
-  (end - start) /
-  (1000 * 60 * 60 * 24);
+    const totalDays = (end - start) / (1000 * 60 * 60 * 24);
 
-for (let i = 0; i <= totalDays; i++) {
+    for (let i = 0; i <= totalDays; i++) {
+      const current = new Date(start);
 
-  const current = new Date(start);
+      current.setDate(start.getDate() + i);
 
-  current.setDate(start.getDate() + i);
+      let status;
 
-  let status;
+      if (i === 0) {
+        status = "CIN";
+      } else if (i === totalDays) {
+        status = "COUT";
+      } else {
+        status = "R";
+      }
 
-  if (i === 0) {
-    status = "CIN";
-  }
-  else if (i === totalDays) {
-    status = "COUT";
-  }
-  else {
-    status = "R";
-  }
-
-  listing.calendar.push({
-    date: current,
-    status,
-    source: "ical"
-  });
-}
+      listing.calendar.push({
+        date: current,
+        status,
+        source: "ical",
+      });
+    }
 
     await listing.save();
 
@@ -384,12 +391,12 @@ export const importICal = async (req, res) => {
 
     const listing = await Listing.findById(id);
     if (req.body.icalUrl?.trim()) {
-  listing.icalUrl = req.body.icalUrl;
+      listing.icalUrl = req.body.icalUrl;
 
-  // yahan tumhari existing importICal logic call hogi
-  // ya helper function bana lo:
-  await importICalData(listing._id, req.body.icalUrl);
-}
+      // yahan tumhari existing importICal logic call hogi
+      // ya helper function bana lo:
+      await importICalData(listing._id, req.body.icalUrl);
+    }
 
     if (!listing) {
       return res.status(404).json({
@@ -521,100 +528,85 @@ export const importICal = async (req, res) => {
       });
 
     // ADD ICAL DATES
-   bookingDates.forEach((d) => {
-  const key = dateOnly(d.date);
+    bookingDates.forEach((d) => {
+      const key = dateOnly(d.date);
 
-  if (!map.has(key)) {
-    map.set(key, []);
-  }
+      if (!map.has(key)) {
+        map.set(key, []);
+      }
 
-  const existing = map.get(key) || [];
+      const existing = map.get(key) || [];
 
-  existing.push({
-    date: d.date,
-    status: d.status,
-    source: d.source,
-  });
+      existing.push({
+        date: d.date,
+        status: d.status,
+        source: d.source,
+      });
 
-  map.set(key, existing);
-});
+      map.set(key, existing);
+    });
     // =====================================
     // CREATE TURNOVER DATES
     // =====================================
 
+    const grouped = {};
 
-const grouped = {};
+    bookingDates.forEach((item) => {
+      const key = dateOnly(item.date);
 
-bookingDates.forEach((item) => {
-  const key = dateOnly(item.date);
+      if (!grouped[key]) {
+        grouped[key] = [];
+      }
 
-  if (!grouped[key]) {
-    grouped[key] = [];
-  }
+      grouped[key].push(item);
+    });
 
-  grouped[key].push(item);
-});
+    Object.keys(grouped).forEach((key) => {
+      const statuses = grouped[key].map((x) => x.status);
 
-Object.keys(grouped).forEach((key) => {
-  const statuses = grouped[key].map((x) => x.status);
+      const hasCin = statuses.includes("CIN");
+      const hasCout = statuses.includes("COUT");
 
-  const hasCin = statuses.includes("CIN");
-  const hasCout = statuses.includes("COUT");
+      if (hasCin && hasCout) {
+         
+      }
+    });
 
-  if (hasCin && hasCout) {
-    console.log("TURNOVER:", key);
-  }
-});
+    // =====================================
+    // FINAL CALENDAR
+    // =====================================
 
-   // =====================================
-// FINAL CALENDAR
-// =====================================
+    listing.calendar = Array.from(map.values()).flat();
 
-listing.calendar = Array.from(map.values()).flat();
+    // remove invalid
+    listing.calendar = listing.calendar.filter((c) => c && c.date);
 
-// remove invalid
-listing.calendar = listing.calendar.filter(
-  (c) => c && c.date
-);
+    // sort by date
+    listing.calendar.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-// sort by date
-listing.calendar.sort(
-  (a, b) => new Date(a.date) - new Date(b.date)
-);
+    // save url
+    listing.icalUrl = url;
+   
+    await listing.save();
 
-// save url
-listing.icalUrl = url;
-console.log(
-  "CIN/COUT DATES =>",
-  listing.calendar.filter(
-    (x) =>
-      x.status === "CIN" ||
-      x.status === "COUT"
-  )
-);
+    // res.json({
+    //   message: "iCal imported successfully",
+    //   total: bookingDates.length,
+    //   calendar: listing.calendar,
+    // });
+    //  const grouped = {};
 
+    bookingDates.forEach((x) => {
+      const key = dateOnly(x.date);
 
-await listing.save();
+      if (!grouped[key]) {
+        grouped[key] = [];
+      }
 
+      grouped[key].push(x.status);
+    });
 
-// res.json({
-//   message: "iCal imported successfully",
-//   total: bookingDates.length,
-//   calendar: listing.calendar,
-// });
-//  const grouped = {};
-
-bookingDates.forEach((x) => {
-  const key = dateOnly(x.date);
-
-  if (!grouped[key]) {
-    grouped[key] = [];
-  }
-
-  grouped[key].push(x.status);
-});
-
-console.log(grouped);
+ 
   } catch (err) {
     console.error("ICAL FINAL ERROR:", err);
 
@@ -622,7 +614,6 @@ console.log(grouped);
       error: err.message,
     });
   }
-  
 };
 
 export const resetICal = async (req, res) => {
@@ -648,6 +639,265 @@ export const resetICal = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Reset failed" });
+  }
+};
+
+export const getAllListingCalendars = async (req, res) => {
+  try {
+    const listings = await Listing.find()
+      .select({
+        property: 1,
+        calendar: 1,
+        icalUrl: 1,
+        status: 1,
+      })
+      .sort({ "property.title": 1 });
+
+    const data = listings.map((listing) => ({
+      _id: listing._id,
+      title: listing.property?.title || "Untitled Property",
+
+      // Old
+      icalUrl: listing.icalUrl || "",
+
+      // New
+      icalSources: listing.icalSources || [],
+
+      calendar: normalizeCalendar(listing.calendar || []),
+    }));
+
+    res.json(data);
+  } catch (err) {
+    console.error("getAllListingCalendars:", err);
+
+    res.status(500).json({
+      error: "Failed to fetch calendars",
+    });
+  }
+};
+
+export const saveICalSources = async (req, res) => {
+ 
+  try {
+    const { id } = req.params;
+    const { icalSources } = req.body;
+
+    const listing = await Listing.findById(id);
+
+    if (!listing) {
+      return res.status(404).json({
+        error: "Listing not found",
+      });
+    }
+
+    listing.icalSources = Array.isArray(icalSources) ? icalSources : [];
+
+    await listing.save();
+
+    res.json({
+      success: true,
+      message: "iCal sources saved successfully",
+      icalSources: listing.icalSources,
+    });
+  } catch (err) {
+    console.error("saveICalSources:", err);
+
+    res.status(500).json({
+      error: "Failed to save iCal sources",
+    });
+  }
+};
+
+
+export const mergeICalSources = async (req, res) => {
+  try {
+    const listing = await Listing.findById(req.params.id);
+
+    if (!listing) {
+      return res.status(404).json({
+        message: "Listing not found",
+      });
+    }
+
+    console.log("========== MERGE ICAL ==========");
+    console.log("LISTING:", listing._id);
+    console.log("ICAL SOURCES:", listing.icalSources);
+
+    const events = await syncListingCalendars(listing);
+
+    console.log("SYNCED EVENTS:", events);
+
+    const mergedCalendar = buildCalendarEntries(events);
+
+    console.log("MERGED CALENDAR:", mergedCalendar);
+
+    listing.calendar = (listing.calendar || []).filter(
+      (item) => item.source !== "ical"
+    );
+
+    listing.calendar.push(...mergedCalendar);
+
+    await listing.save();
+
+    console.log(
+      "SAVED CALENDAR COUNT:",
+      listing.calendar.length
+    );
+
+    res.json({
+      success: true,
+      imported: mergedCalendar.length,
+      calendar: mergedCalendar,
+    });
+
+  } catch (err) {
+    console.error("Merge Error:", err);
+
+    res.status(500).json({
+      message: err.message,
+    });
+  }
+};
+
+// =====================================================
+// EXPORT UNIFIED ICAL
+// =====================================================
+
+// =====================================================
+// EXPORT UNIFIED ICAL
+// =====================================================
+
+export const exportICal = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // ==========================================
+    // VALIDATE LISTING ID
+    // ==========================================
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).send("Invalid listing ID");
+    }
+
+    // ==========================================
+    // FIND LISTING
+    // ==========================================
+
+    const listing = await Listing.findById(id);
+
+    if (!listing) {
+      return res.status(404).send("Listing not found");
+    }
+
+    // ==========================================
+    // GET CALENDAR
+    // ==========================================
+
+    const calendar = normalizeCalendar(
+      listing.calendar || []
+    );
+
+    // ==========================================
+    // SORT BY DATE
+    // ==========================================
+
+    calendar.sort(
+      (a, b) =>
+        new Date(a.date).getTime() -
+        new Date(b.date).getTime()
+    );
+
+    // ==========================================
+    // BUILD BOOKINGS
+    // ==========================================
+
+    const bookings = [];
+
+    let currentBooking = null;
+
+    for (const item of calendar) {
+      const status = item.status;
+
+      // ------------------------------------------
+      // CHECK-IN
+      // ------------------------------------------
+
+      if (status === "CIN") {
+        currentBooking = {
+          start: new Date(item.date),
+          source: item.source,
+        };
+
+        continue;
+      }
+
+      // ------------------------------------------
+      // CHECK-OUT
+      // ------------------------------------------
+
+      if (status === "COUT" && currentBooking) {
+        const start = currentBooking.start;
+        const end = new Date(item.date);
+
+        // Make sure end is after start
+        if (end > start) {
+          bookings.push({
+            start,
+            end,
+            summary: "Reserved",
+            uid: `${id}-${dateOnly(start)}-${dateOnly(end)}`,
+          });
+        }
+
+        currentBooking = null;
+      }
+    }
+
+    // ==========================================
+    // PROPERTY NAME
+    // ==========================================
+
+    const propertyTitle =
+      listing.property?.title ||
+      "Property Calendar";
+
+    // ==========================================
+    // GENERATE ICS
+    // ==========================================
+
+    const ics = generateICal(
+      bookings,
+      propertyTitle
+    );
+
+    // ==========================================
+    // RESPONSE HEADERS
+    // ==========================================
+
+    res.setHeader(
+      "Content-Type",
+      "text/calendar; charset=utf-8"
+    );
+
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="${propertyTitle
+        .replace(/[^a-z0-9]/gi, "-")
+        .toLowerCase()}-calendar.ics"`
+    );
+
+    // ==========================================
+    // SEND ICS
+    // ==========================================
+
+    res.send(ics);
+
+  } catch (err) {
+    console.error("EXPORT ICAL ERROR:", err);
+
+    res.status(500).send(
+      "Failed to generate iCal calendar"
+    );
   }
 };
 // export const clearCalendar = async (

@@ -1,4 +1,4 @@
- import dotenv from "dotenv";
+import dotenv from "dotenv";
 import Listing from "../models/Listing.js";
 import Deal from "../models/Deal.js";
 import Inquiry from "../models/Inquiry.js";
@@ -84,7 +84,8 @@ export const getAllListings = async (req, res) => {
         property
         status
         photos
-        reviews
+         reviews
+         amenities
         createdAt
       `)
 

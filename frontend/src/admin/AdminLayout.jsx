@@ -1,14 +1,20 @@
 import React from "react";
 import Sidebar from "./components/Sidebar";
 
-
 function AdminLayout({ children }) {
   return (
     <div className="min-h-screen bg-gray-100">
+
+      {/* Fixed Sidebar */}
       <Sidebar />
-      <div className="ml-64 p-6 overflow-y-auto">
-        {children}
-      </div>
+
+      {/* Main Content */}
+      <main className="ml-64 min-h-screen">
+        <div className="p-6">
+          {children}
+        </div>
+      </main>
+
     </div>
   );
 }

@@ -21,11 +21,7 @@ const toValidDate = (value) => {
 
 const toDateKey = (date) => {
   const d = new Date(date);
-
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
-    2,
-    "0"
-  )}-${String(d.getDate()).padStart(2, "0")}`;
+  return d.toISOString().split("T")[0]; // 👉 "2026-03-19"
 };
 
 const normalizeNoonDate = (value) => {
@@ -139,41 +135,36 @@ export const previewBooking = async (req, res) => {
 
 
 
-   for (
-  let d = new Date(start);
-  d < end;
-  d.setDate(d.getDate() + 1)
-) {
-  const current = new Date(d);
+    for (let d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
+      const current = new Date(d);
 
-  const currentKey = toDateKey(current);
+      const rate = listing.rates.find((r) => {
+        return (
+          current >= new Date(r.from) &&
+          current <= new Date(r.to)
+        );
+      });
 
-  const rate = listing.rates.find((r) => {
-    const fromKey = toDateKey(r.from);
-    const toKey = toDateKey(r.to);
+      let price = rate?.nightly || 0;
 
-    return currentKey >= fromKey && currentKey <= toKey;
-  });
+      const activeDeal = deals.find((deal) => {
+        const currentKey = toDateKey(current);
+        const startKey = toDateKey(deal.dealStartDate);
+        const endKey = toDateKey(deal.dealEndDate);
 
-  let price = Number(rate?.nightly || 0);
+        return currentKey >= startKey && currentKey <= endKey;
+      });
+      // console.log("CURRENT DATE 👉", current);
+      // console.log("DEAL START 👉", deals[0]?.dealStartDate);
+      // console.log("DEAL END 👉", deals[0]?.dealEndDate);
+      // console.log("ACTIVE DEAL 👉", activeDeal);
+      if (activeDeal) {
+        price = activeDeal.discountedRate;
+      }
 
-  const activeDeal = deals.find((deal) => {
-    const dealStartKey = toDateKey(deal.dealStartDate);
-    const dealEndKey = toDateKey(deal.dealEndDate);
-
-    return (
-      currentKey >= dealStartKey &&
-      currentKey <= dealEndKey
-    );
-  });
-
-  if (activeDeal) {
-    price = Number(activeDeal.discountedRate || 0);
-  }
-
-  subtotal += price;
-  nights++;
-}
+      subtotal += price;
+      nights++;
+    }
 
     // ============================
     // EXTRA FEES

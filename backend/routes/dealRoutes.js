@@ -20,4 +20,5 @@ router.put("/:id", updateDeal);
 
 router.delete("/:id", deleteDeal);
 
+
 export default router;

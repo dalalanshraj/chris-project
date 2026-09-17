@@ -3,26 +3,29 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import api from "../api/axios";
 import { useMemo, useCallback } from "react";
+// import { toast } from "react-toastify";
 
 export default function CalendarTab({ listingId }) {
   const [blockedDates, setBlockedDates] = useState([]);
   const [calendarSource, setCalendarSource] = useState("manual");
-  const [icalUrl, setIcalUrl] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [icalSources, setIcalSources] = useState([
+    {
+      name: "",
+      url: "",
+    },
+  ]);
 
   const [startDate, setStartDate] = useState(null);
 
   const [endDate, setEndDate] = useState(null);
   const [showModal, setShowModal] = useState(false);
-
   const [customerName, setCustomerName] = useState("");
-
   const [customerEmail, setCustomerEmail] = useState("");
-
   const [customerPhone, setCustomerPhone] = useState("");
-
   const [guests, setGuests] = useState(1);
-
   const [comment, setComment] = useState("");
+  const hasICal = icalSources.some((item) => item.url.trim() !== "");
 
   // =====================================
   // FETCH DATES
@@ -34,19 +37,52 @@ export default function CalendarTab({ listingId }) {
     }
   }, [listingId]);
 
-  const fetchDates = () => {
-    api
-      .get(`/calendar/${listingId}/calendar`)
-      .then((res) => {
-        setBlockedDates(res.data.calendar || []);
+  const fetchDates = async () => {
+    try {
+      const res = await api.get(`/calendar/${listingId}/calendar`);
 
-        const savedIcal = res.data.icalUrl || "";
+      setBlockedDates(res.data.calendar || []);
 
-        setIcalUrl(savedIcal);
+     const defaults = [
+  { name: "Airbnb", url: "" },
+  { name: "VRBO", url: "" },
+  { name: "Florida Rentals", url: "" },
+  { name: "OwnerRez", url: "" },
+];
 
-        setCalendarSource(savedIcal ? "ical" : "manual");
-      })
-      .catch(console.log);
+const saved = res.data.icalSources || [];
+
+const merged = defaults.map((item) => {
+  const found = saved.find((s) => s.name === item.name);
+  return found || item;
+});
+
+setIcalSources(merged);
+
+      // ❌ Ye remove kar do
+      // else {
+      //   setCalendarSource("manual");
+      // }
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  const saveICalSources = async () => {
+    const validSources = icalSources.filter((item) => item.url.trim() !== "");
+
+ 
+
+    await api.put(`/calendar/${listingId}/calendar/ical-sources`, {
+      icalSources: validSources,
+    });
+  };
+  const updateSource = (index, value) => {
+    const copy = [...icalSources];
+
+    copy[index].url = value;
+
+    setIcalSources(copy);
   };
 
   // =====================================
@@ -64,22 +100,26 @@ export default function CalendarTab({ listingId }) {
   // =====================================
   // DAY TYPE
   // =====================================
+  const TIMEZONE = "America/Chicago";
+
   const formatLocalDate = (date) => {
-    const d = new Date(date);
+  if (!date) return "";
 
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
+  if (typeof date === "string") {
+    return date.substring(0, 10);
+  }
 
-    return `${year}-${month}-${day}`;
-  };
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+
+  return `${y}-${m}-${d}`;
+};
   const blockedMap = useMemo(() => {
     const map = {};
 
     blockedDates.forEach((item) => {
-      const d = new Date(item.date);
-
-      const key = formatLocalDate(d);
+      const key = formatLocalDate(item.date);
 
       if (!map[key]) {
         map[key] = [];
@@ -90,59 +130,75 @@ export default function CalendarTab({ listingId }) {
 
     return map;
   }, [blockedDates]);
+  
 
-  const getDateType = (date) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+const getDateType = (date) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-    const currentDate = new Date(date);
-    currentDate.setHours(0, 0, 0, 0);
+  const current = new Date(date);
+  current.setHours(0, 0, 0, 0);
 
-    if (currentDate < today) {
-      return "past-day";
-    }
+  const key = formatLocalDate(current);
 
-    const currentKey = formatLocalDate(currentDate);
+  // Past
+  if (current < today) {
+    return "past-day";
+  }
 
-    const statuses = blockedMap[currentKey] || [];
+  const statuses = [...new Set(blockedMap[key] || [])];
 
-    const hasCIN = statuses.includes("CIN");
+  const hasR = statuses.includes("R");
+  const hasH = statuses.includes("H");
+  const hasCIN = statuses.includes("CIN");
+  const hasCOUT = statuses.includes("COUT");
 
-    const hasCOUT = statuses.includes("COUT");
+  // ----------------------------------------------------
+  // TURNOVER (same day checkin + checkout)
+  // ----------------------------------------------------
 
-    const hasR = statuses.includes("R");
+  if (hasCIN && hasCOUT) {
+    return "turnover-day";
+  }
 
-    const hasH = statuses.includes("H");
+  // ----------------------------------------------------
+  // CHECK-IN
+  // ----------------------------------------------------
 
-    const nextDay = new Date(currentDate);
-    nextDay.setDate(nextDay.getDate() + 1);
+  if (hasCIN) {
+    return "checkin-day";
+  }
 
-    const nextKey = formatLocalDate(nextDay);
+  // ----------------------------------------------------
+  // CHECK-OUT
+  // ----------------------------------------------------
 
-    const nextStatuses = blockedMap[nextKey] || [];
+  if (hasCOUT) {
+    return "checkout-day";
+  }
 
-    if ((hasCOUT && nextStatuses.includes("CIN")) || (hasCIN && hasCOUT)) {
-      return "turnover-day";
-    }
+  // ----------------------------------------------------
+  // RESERVED
+  // ----------------------------------------------------
 
-    if (hasCIN) {
-      return "checkin-day";
-    }
+  if (hasR) {
+    return "blocked-day";
+  }
 
-    if (hasCOUT) {
-      return "checkout-day";
-    }
+  // ----------------------------------------------------
+  // HOLD
+  // ----------------------------------------------------
 
-    if (hasR) {
-      return "blocked-day";
-    }
+  if (hasH) {
+    return "hold-day";
+  }
 
-    if (hasH) {
-      return "hold-day";
-    }
+  // ----------------------------------------------------
+  // AVAILABLE
+  // ----------------------------------------------------
 
-    return "available-day";
-  };
+  return "available-day";
+};
   // =====================================
   // MANUAL DATE SELECT
   // =====================================
@@ -230,39 +286,44 @@ export default function CalendarTab({ listingId }) {
   // IMPORT ICAL
   // =====================================
 
-  const importICal = async () => {
-    if (calendarSource !== "ical") {
-      return alert("Please switch Calendar Mode to iCal first.");
-    }
-    if (!icalUrl.trim()) {
-      return alert("Enter iCal URL");
-    }
+  // const importICal = async () => {
+  //   if (calendarSource !== "ical") {
+  //     return alert("Please switch Calendar Mode to iCal first.");
+  //   }
+  //  if (!hasICal) {
+  // return alert("Enter at least one iCal URL");
+  //   }
 
-    try {
-      await api.post(
-        `/calendar/${listingId}/calendar/import-ical`,
+  //   try {
+  //     await api.post(
+  //       `/calendar/${listingId}/calendar/import-ical`,
 
-        {
-          url: icalUrl,
-        },
-      );
+  //       {
+  //         url: hasICal,
+  //       },
+  //     );
 
-      alert("iCal imported successfully");
+  //     alert("iCal imported successfully");
 
-      fetchDates();
-    } catch (err) {
-      console.log(err);
+  //     fetchDates();
+  //   } catch (err) {
+  //     console.log(err);
 
-      alert(err?.response?.data?.error || "iCal failed");
-    }
-  };
+  //     alert(err?.response?.data?.error || "iCal failed");
+  //   }
+  // };
   const resetICal = async () => {
     try {
       await api.put(`/calendar/${listingId}/calendar/reset-ical`);
 
       alert("iCal reset successful");
 
-      setIcalUrl("");
+      setIcalSources([
+        { name: "Airbnb", url: "" },
+        { name: "VRBO", url: "" },
+        { name: "Florida", url: "" },
+        { name: "OwnerRez", url: "" },
+      ]);
 
       fetchDates();
     } catch (err) {
@@ -313,6 +374,42 @@ export default function CalendarTab({ listingId }) {
     return true;
   };
 
+  const mergeICal = async () => {
+    try {
+      setLoading(true);
+
+      await api.post(`/calendar/${listingId}/calendar/merge-ical`);
+
+      await fetchDates();
+ 
+    } catch (err) {
+      console.error(err);
+
+      console.error(err.response?.data?.message || "Failed to merge calendars");
+    } finally {
+      setLoading(false);
+    }
+  };
+  const addICalSource = () => {
+    setIcalSources((prev) => [
+      ...prev,
+      {
+        name: "",
+        url: "",
+      },
+    ]);
+  };
+
+  const removeICalSource = (index) => {
+    setIcalSources((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // const updateSource = (index, field, value) => {
+  //   const copy = [...icalSources];
+  //   copy[index][field] = value;
+  //   setIcalSources(copy);
+  // };
+
   return (
     <div className="w-full flex justify-center px-3 sm:px-6 py-10 bg-[#f8fafc]">
       {/* CARD */}
@@ -339,7 +436,6 @@ export default function CalendarTab({ listingId }) {
               type="button"
               onClick={() => {
                 setCalendarSource("manual");
-                setIcalUrl("");
                 setStartDate(null);
                 setEndDate(null);
               }}
@@ -353,7 +449,7 @@ export default function CalendarTab({ listingId }) {
         duration-300
         hover:shadow-lg
         ${
-          !icalUrl
+          !hasICal
             ? "border-green-500 bg-green-50 shadow-md scale-[1.02]"
             : "border-gray-200 bg-white hover:border-green-300"
         }
@@ -370,7 +466,7 @@ export default function CalendarTab({ listingId }) {
                   </p>
                 </div>
 
-                {!icalUrl && (
+                {!hasICal && (
                   <div className="w-7 h-7 rounded-full bg-green-500 flex items-center justify-center text-white font-bold">
                     ✓
                   </div>
@@ -396,7 +492,7 @@ export default function CalendarTab({ listingId }) {
         duration-300
         hover:shadow-lg
         ${
-          icalUrl
+          hasICal
             ? "border-blue-500 bg-blue-50 shadow-md scale-[1.02]"
             : "border-gray-200 bg-white hover:border-blue-300"
         }
@@ -413,7 +509,7 @@ export default function CalendarTab({ listingId }) {
                   </p>
                 </div>
 
-                {icalUrl && (
+                {hasICal && (
                   <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
                     ✓
                   </div>
@@ -425,49 +521,63 @@ export default function CalendarTab({ listingId }) {
           {/* STATUS */}
           <div
             className={`mt-4 rounded-xl px-4 py-3 text-sm font-medium border ${
-              icalUrl
+              hasICal
                 ? "bg-blue-50 border-blue-200 text-blue-700"
                 : "bg-green-50 border-green-200 text-green-700"
             }`}
           >
-            {icalUrl
+            {hasICal
               ? "🔗 iCal Sync Active — Manual booking disabled"
               : "📅 Manual Calendar Active — iCal import disabled"}
           </div>
         </div>
-        <button
-          onClick={clearCalendar}
-          className="
-    bg-red-600
-    text-white
-    py-3
-    rounded-xl
-    font-semibold
-    hover:bg-red-700
-  "
-        >
-          Reset Calendar
-        </button>
+        
 
         {/* ICAL SECTION */}
         {calendarSource === "ical" && (
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-3 mb-6">
-            <input
-              type="text"
-              value={icalUrl}
-              onChange={(e) => setIcalUrl(e.target.value)}
-              placeholder="Paste iCal URL"
-              className="
-      w-full
-      border
-      border-gray-200
-      rounded-xl
-      px-4
-      py-3
-    "
-            />
+            <div className="space-y-4">
+              {icalSources.map((item, index) => (
+                <div key={index}>
+                  <label className="block text-sm font-semibold mb-2">
+                    {item.name} URL
+                  </label>
 
-            <button
+                  <input
+                    type="text"
+                    value={item.url}
+                    onChange={(e) => updateSource(index, e.target.value)}
+                    placeholder={`Paste ${item.name} iCal URL`}
+                    className="w-full border rounded-xl px-4 py-3"
+                  />
+                </div>
+              ))}
+
+              <div className="flex flex-wrap gap-3 pt-2">
+                <button
+                  onClick={saveICalSources}
+                  className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700"
+                >
+                  Save URLs
+                </button>
+
+                <button
+                  onClick={mergeICal}
+                  disabled={loading}
+                  className="bg-green-600 text-white px-6 py-3 rounded-xl hover:bg-green-700 disabled:opacity-50"
+                >
+                  {loading ? "Merging..." : "Merge Calendars"}
+                </button>
+
+                <button
+                  onClick={resetICal}
+                  className="bg-red-600 text-white px-6 py-3 rounded-xl hover:bg-red-700"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+            {/* <button
               onClick={importICal}
               className="
       bg-blue-600
@@ -478,19 +588,40 @@ export default function CalendarTab({ listingId }) {
     "
             >
               Import
-            </button>
+            </button> */}
+            {/* <button
+              onClick={saveICalSources}
+              className="
+    bg-blue-600
+    text-white
+    px-6
+    py-3
+    rounded-xl
+  "
+            >
+              Save iCal URLs
+            </button> */}
+            {/* <button
+              onClick={mergeICal}
+              disabled={loading}
+              className="
+    bg-green-600
+    text-white
+    px-6
+    py-3
+    rounded-xl
+    hover:bg-green-700
+    disabled:opacity-50
+  "
+            >
+              {loading ? "Merging..." : "Merge Calendars"}
+            </button> */}
 
             <button
-              onClick={resetICal}
-              className="
-      bg-red-500
-      text-white
-      px-5
-      py-3
-      rounded-xl
-    "
+              
+   
             >
-              Reset
+              
             </button>
           </div>
         )}

@@ -1,4 +1,4 @@
-  import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
   MdDashboard,
@@ -18,7 +18,7 @@ const Sidebar = () => {
   const token = localStorage.getItem("token");
 
   const API_URL =
-    import.meta.env.VITE_API_URL || "http://localhost:4005";
+    import.meta.env.VITE_API_URL || "http://localhost:4015";
 
   useEffect(() => {
     fetchProfile();
@@ -41,8 +41,8 @@ const Sidebar = () => {
   const linkClass = ({ isActive }) =>
     `flex items-center gap-3 px-4 py-2 rounded-lg transition ${
       isActive
-        ? "bg-blue-600 text-white"
-        : "text-gray-300 hover:bg-gray-800 hover:text-white"
+        ? "bg-[#EBE8FF] text-black"
+        : "text-black hover:bg-gray-200 hover:text-black"
     }`;
 
   const handleLogout = () => {
@@ -52,7 +52,7 @@ const Sidebar = () => {
   };
 
   return (
-    <div className="fixed top-0 left-0 w-64 h-screen bg-gray-900 text-white p-4 flex flex-col">
+    <div className="fixed top-0 left-0 w-64 h-screen bg-[#F8F9FA] shadow-xl text-black p-4 flex flex-col">
       <h2 className="text-2xl font-bold mb-6">Admin Panel</h2>
 
       <div className="mb-6 border-b border-gray-700 pb-4 flex items-center gap-3">
@@ -64,7 +64,7 @@ const Sidebar = () => {
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-blue-600 text-white font-bold">
+            <div className="w-full h-full flex items-center justify-center bg-white text-black font-bold">
               {user?.name?.charAt(0)?.toUpperCase() || "A"}
             </div>
           )}
@@ -78,7 +78,7 @@ const Sidebar = () => {
         </div>
       </div>
 
-      <nav className="space-y-2 flex flex-col flex-grow">
+      <nav className="space-y-2 flex flex-col flex-grow ">
         <NavLink to="/admin/dashboard" className={linkClass}>
           <MdDashboard size={20} />
           Dashboard
@@ -112,7 +112,7 @@ const Sidebar = () => {
 
       <button
         onClick={handleLogout}
-        className="flex items-center gap-3 hover:text-red-500 text-white px-4 py-2 rounded-lg mt-6"
+        className="flex items-center gap-3 hover:text-red-500 text-black px-4 py-2 rounded-lg mt-6"
       >
         <MdLogout size={20} />
         Logout

@@ -12,15 +12,30 @@ const listingSchema = new mongoose.Schema(
       type: new mongoose.Schema(
         {
           title: String,
+
           category: String,
+
+          
+          calendarSource: {
+            type: String,
+            enum: ["ical", "manual"],
+            default: "manual",
+          },
+
           type: String,
           bedrooms: Number,
           bathrooms: Number,
           maxSleeps: Number,
+          email: String,
+          phone:String,
           altEmail: String,
           altPhone: String,
+           iVacationPropertyId: {
+        type: String,
+        default: "",
+      },
         },
-        { _id: false }
+        { _id: false },
       ),
       default: {},
     },
@@ -45,14 +60,14 @@ const listingSchema = new mongoose.Schema(
 
     // ✅ PHOTOS
     photos: {
-  type: [
-    {
-      url: String,
-      order: Number,
+      type: [
+        {
+          url: String,
+          order: Number,
+        },
+      ],
+      default: [],
     },
-  ],
-  default: [],
-},
 
     // ✅ VIDEO
     video: {
@@ -105,6 +120,7 @@ const listingSchema = new mongoose.Schema(
       lng: Number,
       address: String,
     },
+    // reviews
     reviews: [
       {
         name: String,
@@ -116,59 +132,74 @@ const listingSchema = new mongoose.Schema(
 
         published: {
           type: Boolean,
-          default: false
+          default: false,
         },
 
         reply: String,
 
         createdAt: {
           type: Date,
-          default: Date.now
-        }
-      }
-    ],
-  //  Calendar Model
-
-calendar: {
-  type: [
-    {
-      date: {
-        type: Date,
-        required: true,
-        validate: {
-          validator: function (value) {
-            return value instanceof Date && !isNaN(value.getTime());
-          },
-          message: "Invalid calendar date",
+          default: Date.now,
         },
       },
+    ],
+    //  Calendar Model
 
-     status: {
-  type: String,
-  enum: ["A", "R", "H", "CIN", "COUT"], 
-  default: "A",
-},
+    calendar: [
+      {
+        date: Date,
 
-      source: {
-        type: String,
-        enum: ["internal", "booking", "admin", "ical"],
-        default: "internal",
+        status: {
+          type: String,
+          enum: ["A", "R", "H", "CIN", "COUT"],
+          default: "A",
+        },
+
+        source: {
+          type: String,
+          enum: ["internal", "booking", "admin", "ical"],
+          default: "admin",
+        },
+
+        customerName: String,
+
+        customerEmail: String,
+
+        customerPhone: String,
+
+        comment: String,
+
+        checkInDate: Date,
+
+        checkOutDate: Date,
       },
-
-      price: Number,
+    ],
+    icalSources: [
+  {
+    name: {
+      type: String,
+      default: "",
+      trim: true,
     },
-  ],
-  default: [],
-},
-icalUrl: {
-  type: String,
-  default: "",
-},
-
-
+    url: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    enabled: {
+      type: Boolean,
+      default: true,
+    },
   },
-  
-  { timestamps: true }
+],
+
+    icalUrl: {
+      type: String,
+      default: "",
+    },
+  },
+
+  { timestamps: true },
 );
 
 export default mongoose.model("Listing", listingSchema);
