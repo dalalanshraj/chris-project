@@ -255,13 +255,13 @@ const blockedMap = useMemo(() => {
 
         {/* AVAILABLE */}
         <div className="flex items-center gap-2">
-          <span className="w-4 h-4 bg-[#d1fae5] rounded"></span>
+          <span className="w-4 h-4 bg-[#FFE7E7] rounded"></span>
           Available
         </div>
 
         {/* BOOKED */}
         <div className="flex items-center gap-2">
-          <span className="w-4 h-4 bg-[#5C5CFF] rounded"></span>
+          <span className="w-4 h-4 bg-[#ADB8D6] rounded"></span>
           Booked
         </div>
 
@@ -271,7 +271,7 @@ const blockedMap = useMemo(() => {
             className="w-4 h-4 rounded border"
             style={{
               background:
-                "linear-gradient(135deg, #d1fae5 50%, #5C5CFF 50%)",
+                "linear-gradient(135deg, #FFE7E7 50%, #ADB8D6 50%)",
             }}
           ></span>
           Check-In
@@ -283,7 +283,7 @@ const blockedMap = useMemo(() => {
             className="w-4 h-4 rounded border"
             style={{
               background:
-                "linear-gradient(315deg, #d1fae5 50%, #5C5CFF 50%)",
+                "linear-gradient(315deg, #FFE7E7 50%, #ADB8D6 50%)",
             }}
           ></span>
           Check-Out
@@ -298,7 +298,7 @@ const blockedMap = useMemo(() => {
               className="absolute inset-0"
               style={{
                 background:
-                  "linear-gradient(to bottom right, #5C5CFF 49%, #d1fae5 51%)",
+                  "linear-gradient(to bottom right, #ADB8D6 49%, #FFE7E7 51%)",
               }}
             ></span>
 
@@ -408,7 +408,7 @@ const blockedMap = useMemo(() => {
 /* AVAILABLE */
 .react-datepicker__day.available-day {
 
-  background: #d1fae5 !important;
+  background: #FFE7E7 !important;
 
   color: black !important;
 
@@ -417,7 +417,7 @@ const blockedMap = useMemo(() => {
 /* BOOKED */
 .react-datepicker__day.blocked-day {
 
-  background: #5C5CFF !important;
+  background: #ADB8D6 !important;
 
   color: white !important;
 
@@ -428,8 +428,8 @@ const blockedMap = useMemo(() => {
 
   background: linear-gradient(
     135deg,
-    #d1fae5 50%,
-    #5C5CFF 50%
+    #FFE7E7 50%,
+    #ADB8D6 50%
   ) !important;
 
   color: black !important;
@@ -441,8 +441,8 @@ const blockedMap = useMemo(() => {
 
   background: linear-gradient(
     315deg,
-    #d1fae5 50%,
-    #5C5CFF 50%
+    #FFE7E7 50%,
+    #ADB8D6 50%
   ) !important;
 
   color: black !important;
@@ -475,10 +475,10 @@ const blockedMap = useMemo(() => {
 
   background: linear-gradient(
     to bottom right,
-    #5C5CFF 0%,
-    #5C5CFF 49%,
-    #5C5CFF 51%,
-    #5C5CFF 100%
+    #ADB8D6 0%,
+    #ADB8D6 49%,
+    #ADB8D6 51%,
+    #ADB8D6 100%
   );
 
   z-index: -1;

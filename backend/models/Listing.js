@@ -146,34 +146,83 @@ const listingSchema = new mongoose.Schema(
     //  Calendar Model
 
     calendar: [
-      {
-        date: Date,
+  {
+    bookingId: mongoose.Schema.Types.ObjectId,
 
-        status: {
-          type: String,
-          enum: ["A", "R", "H", "CIN", "COUT"],
-          default: "A",
-        },
+    date: Date,
 
-        source: {
-          type: String,
-          enum: ["internal", "booking", "admin", "ical"],
-          default: "admin",
-        },
+    status: {
+      type: String,
+      enum: ["A", "R", "H", "CIN", "COUT"],
+      default: "A",
+    },
 
-        customerName: String,
+    source: {
+      type: String,
+      enum: ["internal", "booking", "admin", "ical"],
+      default: "admin",
+    },
+  },
+],
 
-        customerEmail: String,
+manualBookings: [
+  {
+    customerName: {
+      type: String,
+      default: "",
+      trim: true,
+    },
 
-        customerPhone: String,
+    customerEmail: {
+      type: String,
+      default: "",
+      trim: true,
+    },
 
-        comment: String,
+    customerPhone: {
+      type: String,
+      default: "",
+      trim: true,
+    },
 
-        checkInDate: Date,
+    checkIn: {
+      type: Date,
+      required: true,
+    },
 
-        checkOutDate: Date,
-      },
-    ],
+    checkOut: {
+      type: Date,
+      required: true,
+    },
+
+    guests: {
+      type: Number,
+      default: 0,
+    },
+
+    nights: {
+      type: Number,
+      default: 0,
+    },
+
+    comment: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    status: {
+      type: String,
+      enum: ["pending", "confirmed", "cancelled"],
+      default: "confirmed",
+    },
+
+    bookedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+],
     icalSources: [
   {
     name: {

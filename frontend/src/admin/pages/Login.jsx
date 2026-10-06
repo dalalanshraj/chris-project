@@ -121,10 +121,7 @@ const Login = () => {
       Secure Owner Dashboard
     </p>
      <div className="mt-1 pt-1 border-t border-white/50 text-center">
-  <p className="text-xs text-gray-500 mb-2">
-    Admin Portal
-  </p>
-
+   
   <div className="flex justify-center">
     <img
       src="/blackLOGO.webp"

@@ -3,6 +3,9 @@ import {
   addCalendarDate,
   removeCalendarDate,
   getCalendar,
+  createManualBooking,
+   updateManualBooking,
+  deleteManualBooking,
   blockDates,
   unblockDates,
   cleanDuplicateCalendar,
@@ -35,6 +38,25 @@ router.get("/month", (req, res) => {
 });
 
 router.get("/:id/calendar", getCalendar);
+router.post(
+  "/:id/manual-booking",
+  isAuth,
+  isAdmin,
+  createManualBooking
+);
+router.put(
+  "/:id/manual-booking/:bookingId",
+  isAuth,
+  isAdmin,
+  updateManualBooking
+);
+
+router.delete(
+  "/:id/manual-booking/:bookingId",
+  isAuth,
+  isAdmin,
+  deleteManualBooking
+);
 router.post("/:id/calendar/block", isAuth, isAdmin, blockDates);
 router.post("/:id/calendar/unblock", isAuth, isAdmin, unblockDates);
 

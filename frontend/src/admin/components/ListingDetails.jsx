@@ -546,6 +546,11 @@ export default function ListingCard({
                 to={`/admin/listings/${listing._id}?tab=Rates`}
                 label="Rates"
               />
+              <QuickLink
+                to={`/admin/listings/${listing._id}?tab=Calendar`}
+                label="Calendar"
+              />
+
 
               <QuickLink
                 to={`/admin/listings/${listing._id}?tab=Location`}
